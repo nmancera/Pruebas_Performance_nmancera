@@ -10,22 +10,53 @@ jobs:
   jmeter-test:
     runs-on: windows-latest
 
+    env:
+      JMETER_VERSION: "5.6.2"
+      JMETER_URL: "https://archive.apache.org/dist/jmeter/binaries/apache-jmeter-5.6.2.zip"
+      JMETER_HOME: "${{ runner.temp }}\\jmeter"
+      ARTIFACTORY_URL: "https://tu-jfrog/artifactory"
+      ARTIFACTORY_REPO: "jmeter-results"
+      ARTIFACTORY_USER: ${{ secrets.JFROG_USER }}
+      ARTIFACTORY_PASS: ${{ secrets.JFROG_PASS }}
+
     steps:
     - name: Checkout del código
       uses: actions/checkout@v3
 
     - name: Descargar JMeter
+      shell: pwsh
       run: |
-        curl -L https://archive.apache.org/dist/jmeter/binaries/apache-jmeter-5.6.2.zip -o jmeter.zip
-        Expand-Archive jmeter.zip -DestinationPath $env:USERPROFILE\jmeter
+        Write-Host "Descargando JMeter..."
+        Invoke-WebRequest -Uri $env:JMETER_URL -OutFile jmeter.zip
+        Expand-Archive jmeter.zip -DestinationPath $env:JMETER_HOME
+        Write-Host "JMeter descargado en $env:JMETER_HOME"
 
     - name: Ejecutar pruebas JMeter
+      shell: pwsh
       run: |
-        $JMETER="$env:USERPROFILE\jmeter\apache-jmeter-5.6.2\bin\jmeter.bat"
-        & $JMETER -n -t pruebas.jmx -l resultados.jtl
+        $JMETER = "$env:JMETER_HOME\\apache-jmeter-$env:JMETER_VERSION\\bin\\jmeter.bat"
+        Write-Host "Ejecutando JMeter desde: $JMETER"
+        & $JMETER -n -t pruebas.jmx -l resultados.jtl -j jmeter.log
+
+    - name: Subir resultados a JFrog Artifactory
+      shell: pwsh
+      run: |
+        $pair = "$env:ARTIFACTORY_USER`:$env:ARTIFACTORY_PASS"
+        $encoded = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes($pair))
+        $headers = @{ Authorization = "Basic $encoded" }
+
+        Write-Host "Subiendo resultados.jtl a Artifactory..."
+        Invoke-RestMethod -Uri "$env:ARTIFACTORY_URL/$env:ARTIFACTORY_REPO/resultados.jtl" `
+          -Method Put -InFile "resultados.jtl" -Headers $headers
+
+        Write-Host "Subiendo jmeter.log a Artifactory..."
+        Invoke-RestMethod -Uri "$env:ARTIFACTORY_URL/$env:ARTIFACTORY_REPO/jmeter.log" `
+          -Method Put -InFile "jmeter.log" -Headers $headers
 
     - name: Guardar resultados como artefacto
       uses: actions/upload-artifact@v3
       with:
         name: resultados-jmeter
-        path: resultados.jtl
+        path: |
+          resultados.jtl
+          jmeter.log
