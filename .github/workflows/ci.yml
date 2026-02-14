@@ -1,0 +1,31 @@
+name: JMeter Performance Tests (Windows)
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  jmeter-test:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout del código
+      uses: actions/checkout@v3
+
+    - name: Descargar JMeter
+      run: |
+        curl -L https://archive.apache.org/dist/jmeter/binaries/apache-jmeter-5.6.2.zip -o jmeter.zip
+        Expand-Archive jmeter.zip -DestinationPath $env:USERPROFILE\jmeter
+
+    - name: Ejecutar pruebas JMeter
+      run: |
+        $JMETER="$env:USERPROFILE\jmeter\apache-jmeter-5.6.2\bin\jmeter.bat"
+        & $JMETER -n -t pruebas.jmx -l resultados.jtl
+
+    - name: Guardar resultados como artefacto
+      uses: actions/upload-artifact@v3
+      with:
+        name: resultados-jmeter
+        path: resultados.jtl
