@@ -1,0 +1,3 @@
+Artefacts -> Configuraciones de Jmeter
+Resultado Performance -> Documento del resultado de las pruebas
+github Workflows -> Pipeline de ejeucion.
